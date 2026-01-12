@@ -1,0 +1,80 @@
+version: '3.8'
+
+volumes:
+  prometheus-data: {}
+  grafana-data: {}
+
+networks:
+  monitoring:
+    driver: bridge
+
+services:
+  # Votre application Solar Simulator
+  solar-simulator:
+    build:
+      context: ./src/solar-simulator
+      dockerfile: Dockerfile
+    container_name: solar-simulator
+    ports:
+      - "9100:9100"
+    environment:
+      NODE_ENV: production
+      PORT: 9100
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9100/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      - prometheus
+
+  # Prometheus pour scraper les métriques
+  prometheus:
+    image: prom/prometheus:v2.50.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./k8s/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./k8s/monitoring/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - monitoring
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Grafana pour les dashboards
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=
+    volumes:
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3

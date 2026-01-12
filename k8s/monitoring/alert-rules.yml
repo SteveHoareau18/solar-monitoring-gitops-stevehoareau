@@ -1,0 +1,33 @@
+groups:
+  - name: solar_alerts
+    interval: 30s
+    rules:
+      - alert: HighTemperature
+        expr: solar_panel_temperature_celsius > 70
+        for: 5m
+        annotations:
+          summary: "Surchauffe panneau - {{ $labels.farm }}"
+
+      - alert: LowProduction
+        expr: solar_farm_total_power_watts < 1000000
+        for: 10m
+        annotations:
+          summary: "Production basse - {{ $labels.farm }}"
+
+      - alert: InverterDown
+        expr: solar_inverter_status == 0
+        for: 2m
+        annotations:
+          summary: "Onduleur défaillant - {{ $labels.farm }}"
+
+      - alert: HighAnomalyRate
+        expr: rate(solar_anomalies_total[1h]) > 0.5
+        for: 5m
+        annotations:
+          summary: "Taux d'anomalies élevé - {{ $labels.farm }}"
+
+      - alert: LowAvailability
+        expr: solar_availability_ratio < 0.95
+        for: 30m
+        annotations:
+          summary: "Disponibilité basse - {{ $labels.farm }}"

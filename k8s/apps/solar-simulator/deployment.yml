@@ -2,7 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: solar-simulator
-  namespace: solar-prod
+  labels:
+    app: solar-simulator
 spec:
   replicas: 1
   selector:
@@ -14,14 +15,31 @@ spec:
         app: solar-simulator
     spec:
       containers:
-      - name: simulator
-        image: solar-simulator:latest
-        ports:
-        - containerPort: 3000
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "100m"
-          limits:
-            memory: "256Mi"
-            cpu: "200m"
+        - name: solar-simulator
+          image: localhost:5001/solar-simulator:v1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9100
+              name: metrics
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9100
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 9100
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          env:
+            - name: NODE_ENV
+              value: "production"
